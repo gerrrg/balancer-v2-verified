@@ -6,6 +6,7 @@
 pragma solidity ^0.7.0;
 pragma experimental ABIEncoderV2;
 
+/// Gerg: why are you importing IVault here? Not necessary in interface and already imported in factory contract
 import '@balancer-labs/v2-interfaces/contracts/vault/IVault.sol';
 interface IPrimaryIssuePoolFactory {
 
