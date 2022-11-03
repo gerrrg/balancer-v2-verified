@@ -1,0 +1,29 @@
+Primary Pool Review
+
+Critical: Pool can steal tokens from traders
+- all _swap{Currency,Security}{In,Out} functions check that a pool is within bounds after a swap. If within bounds, return calculated amount, else return 0. This means a user can attempt to swap tokens and receives nothing. This must revert instead of returning zero
+
+Errors
+- Could not run tests
+- Hard coded array index accessing element; intended index could be different
+- It seems like the expected behavior is _INITIAL_BPT_SUPPLY gets preminted to the pool *and* given to the pool joiner (pool itself). What is the actual intended use?
+- Hard coded values instead of using passed arguments
+
+Unusual Design Pattern
+- initialize() function: pool seems to own its own BPT?
+- exit() function: calculates output tokens; why not just query amount in pool?
+- Needless if statements -- require(conditionX); if(conditionX){...}
+
+Style
+- Defunct, commented lines in code
+- Missing useful comments throughout (ideally NatSpec)
+- Expected use invoking emergency functions (_emergencyProportionalExit)
+- using if(condition){revert()}else{...} instead of require(condition,reason)
+
+Gas Optimizations
+- Pool is IVault.PoolSpecialization.GENERAL when it should be IVault.PoolSpecialization.MINIMAL_SWAP_INFO
+- Reading from storage when variables are available in memory
+- Writing full struct to storage and writing each element separately
+- Writing variables to storage when available from inherited contract
+- Repeated storage read calls w/in one function. Call once and read from memory.
+- Setting just-created array elements to zero; they are already zero
