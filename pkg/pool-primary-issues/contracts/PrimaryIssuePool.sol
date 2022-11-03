@@ -31,6 +31,7 @@ contract PrimaryIssuePool is IPrimaryPool, BasePool, IGeneralPool {
     IERC20 private immutable _security;
     IERC20 private immutable _currency;
 
+    // Gerg -- private?
     IPrimaryIssuePoolFactory.FactoryPoolParams factoryPoolParams;
 
     uint256 private constant _TOTAL_TOKENS = 3; //Security token, Currency token (ie, paired token), Balancer pool token
@@ -64,14 +65,14 @@ contract PrimaryIssuePool is IPrimaryPool, BasePool, IGeneralPool {
 
     constructor(
         IVault vault,
-        IPrimaryIssuePoolFactory.FactoryPoolParams memory _factoryPoolParams,
+        IPrimaryIssuePoolFactory.FactoryPoolParams memory _factoryPoolParams, // Gerg -- why does this have a leading underscore? 
         uint256 pauseWindowDuration,
         uint256 bufferPeriodDuration,
         address owner
     )
         BasePool(
             vault,
-            IVault.PoolSpecialization.GENERAL,
+            IVault.PoolSpecialization.GENERAL, // Gerg: TODO -- do you actually need to be general? seems like it could probably be minimal swap info
             _factoryPoolParams.name,
             _factoryPoolParams.symbol,
             _sortTokens(IERC20(_factoryPoolParams.security), IERC20(_factoryPoolParams.currency), this),
@@ -82,15 +83,16 @@ contract PrimaryIssuePool is IPrimaryPool, BasePool, IGeneralPool {
             owner
         )
     {
+        // Gerg -- why save all params in struct but also save all other variables separately?
         factoryPoolParams = _factoryPoolParams;
         // set tokens
-        _security = IERC20(factoryPoolParams.security);
-        _currency = IERC20(factoryPoolParams.currency);
+        _security = IERC20(factoryPoolParams.security); // Gerg -- why are you doing a storage read? This is already in memory
+        _currency = IERC20(factoryPoolParams.currency); // Gerg -- why are you doing a storage read? This is already in memory
 
         // Set token indexes
         (uint256 securityIndex, uint256 currencyIndex, uint256 bptIndex) = _getSortedTokenIndexes(
-            IERC20(factoryPoolParams.security),
-            IERC20(factoryPoolParams.currency),
+            IERC20(factoryPoolParams.security), // Gerg -- why are you doing a storage read? This is already in memory
+            IERC20(factoryPoolParams.currency), // Gerg -- why are you doing a storage read? This is already in memory
             this
         );
         _securityIndex = securityIndex;
@@ -98,22 +100,22 @@ contract PrimaryIssuePool is IPrimaryPool, BasePool, IGeneralPool {
         _bptIndex = bptIndex;
 
         // set scaling factors
-        _scalingFactorSecurity = _computeScalingFactor(IERC20(factoryPoolParams.security));
-        _scalingFactorCurrency = _computeScalingFactor(IERC20(factoryPoolParams.currency));
+        _scalingFactorSecurity = _computeScalingFactor(IERC20(factoryPoolParams.security)); // Gerg -- why are you doing a storage read? This is already in memory
+        _scalingFactorCurrency = _computeScalingFactor(IERC20(factoryPoolParams.currency)); // Gerg -- why are you doing a storage read? This is already in memory
 
         // set price bounds
-        _minPrice = factoryPoolParams.minimumPrice;
-        _maxPrice = factoryPoolParams.basePrice;
+        _minPrice = factoryPoolParams.minimumPrice; // Gerg -- why are you doing a storage read? This is already in memory
+        _maxPrice = factoryPoolParams.basePrice; // Gerg -- why are you doing a storage read? This is already in memory. Why a difference between maxPrice and basePrice? Unify these names
 
         // set max total balance of securities
-        _MAX_TOKEN_BALANCE = factoryPoolParams.maxAmountsIn;
+        _MAX_TOKEN_BALANCE = factoryPoolParams.maxAmountsIn; // Gerg -- why are you doing a storage read? This is already in memory
 
         // set issue time bounds
-        _cutoffTime = factoryPoolParams.cutOffTime;
+        _cutoffTime = factoryPoolParams.cutOffTime; // Gerg -- why are you doing a storage read? This is already in memory
         _startTime = block.timestamp;
 
         //set owner
-        _balancerManager = owner;     
+        _balancerManager = owner; // Gerg -- why store owner separately? Why not just access owner with getOwner()? 
     }
 
     function getSecurity() external view override returns (IERC20) {
@@ -154,10 +156,16 @@ contract PrimaryIssuePool is IPrimaryPool, BasePool, IGeneralPool {
 
     function initialize() external {
         bytes32 poolId = getPoolId();
+        // Gerg -- add `IVault vault = getVault();`
+        // use vault instead of repeated getVault() calls
+
         (IERC20[] memory tokens, , ) = getVault().getPoolTokens(poolId);
+        
+        // Gerg -- get rid of this commented lines
         //IAsset[] memory _assets = new IAsset[](_TOTAL_TOKENS);
         //_assets[0] = IAsset(address(_security));
         //_assets[1] = IAsset(address(_currency));
+
         uint256[] memory _maxAmountsIn = new uint256[](_TOTAL_TOKENS);
         _maxAmountsIn[_securityIndex] = _MAX_TOKEN_BALANCE;
         _maxAmountsIn[_currencyIndex] = Math.div(_MAX_TOKEN_BALANCE, _minPrice, false);
@@ -170,28 +178,35 @@ contract PrimaryIssuePool is IPrimaryPool, BasePool, IGeneralPool {
             fromInternalBalance: false
         });
 
-        getVault().joinPool(getPoolId(), address(this), address(this), request);
-        emit OpenIssue(address(_security), _minPrice, _maxPrice, _maxAmountsIn[1], _cutoffTime);
+        // Gerg -- it's a very unusual pattern to have the pool hold its own tokens. What is your goal here?
+        getVault().joinPool(getPoolId(), address(this), address(this), request); // Gerg -- don't call getPoolId() when you have poolId?
+        emit OpenIssue(address(_security), _minPrice, _maxPrice, _maxAmountsIn[1], _cutoffTime); // Gerg -- you don't know that securityOffered is at index 1. why is this hard coded?
     }
 
     function exit() external {
         bytes32 poolId = getPoolId();
+        // Gerg -- add `IVault vault = getVault();`
+        // use vault instead of repeated getVault() calls
         (IERC20[] memory tokens, , ) = getVault().getPoolTokens(poolId);
+
+        // Gerg -- get rid of this commented lines
         //IAsset[] memory _assets = new IAsset[](2);
         //_assets[0] = IAsset(address(_security));
         //_assets[1] = IAsset(address(_currency));
+
         uint256[] memory _minAmountsOut = new uint256[](_TOTAL_TOKENS);
-        _minAmountsOut[_securityIndex] = 0;
-        _minAmountsOut[_currencyIndex] = Math.div(_MAX_TOKEN_BALANCE, _maxPrice, false);
-        _minAmountsOut[_bptIndex] = 0;
+        _minAmountsOut[_securityIndex] = 0; // Gerg -- this is already initialized to zero. This line is not needed
+        _minAmountsOut[_currencyIndex] = Math.div(_MAX_TOKEN_BALANCE, _maxPrice, false); // Gerg -- how do you know this is the minimum amount out you want? Why not query amount in the pool?
+        _minAmountsOut[_bptIndex] = 0; // Gerg -- this is already initialized to zero. This line is not needed
         IVault.ExitPoolRequest memory request = IVault.ExitPoolRequest({
             //assets: _assets,
             assets: _asIAsset(tokens),
             minAmountsOut: _minAmountsOut,
-            userData: abi.encode(PrimaryPoolUserData.ExitKind.EMERGENCY_EXACT_BPT_IN_FOR_TOKENS_OUT, _INITIAL_BPT_SUPPLY),
+            userData: abi.encode(PrimaryPoolUserData.ExitKind.EMERGENCY_EXACT_BPT_IN_FOR_TOKENS_OUT, _INITIAL_BPT_SUPPLY), // Gerg -- why are you calling this EMERGENCY? Seems like the standard expected use
             toInternalBalance: false
         });
-        getVault().exitPool(getPoolId(), address(this), payable(_balancerManager), request);
+        // Gerg -- it seems like this call will fail unless the pool is paused, but I see no call pausing the pool
+        getVault().exitPool(getPoolId(), address(this), payable(_balancerManager), request); // Gerg -- don't call getPoolId() when you have poolId?
     }
 
     function onSwap(
@@ -203,6 +218,8 @@ contract PrimaryIssuePool is IPrimaryPool, BasePool, IGeneralPool {
         // ensure that swap request is not beyond issue's cut off time
         require(BokkyPooBahsDateTimeLibrary.addSeconds(_startTime, _cutoffTime) >= block.timestamp, "TimeLimit Over");
         // ensure that price is within price band
+        // Gerg -- ^ where are you ensuring this?
+
         uint256[] memory scalingFactors = _scalingFactors();
         Params memory params = Params({ fee: getSwapFeePercentage(), minPrice: _minPrice, maxPrice: _maxPrice });
 
@@ -223,6 +240,7 @@ contract PrimaryIssuePool is IPrimaryPool, BasePool, IGeneralPool {
         Params memory params
     ) internal returns (uint256) {
         //BPT is only held by the pool manager transferred to it during pool initialization, so no BPT swap is considered
+        // Gerg -- ^ why bother using preminted BPT then? The entire point of that design pattern is to swap into BPT.
         if (request.tokenIn == _security) {
             return _swapSecurityIn(request, balances, params);
         } else if (request.tokenIn == _currency) {
@@ -232,6 +250,7 @@ contract PrimaryIssuePool is IPrimaryPool, BasePool, IGeneralPool {
         }
     }
 
+    // Gerg -- The bulk of the code in _swapSecurityIn and _swapCurrencyIn is identical. This should be one function with arguments for which token is coming in.
     function _swapSecurityIn(
         SwapRequest memory request,
         uint256[] memory balances,
@@ -241,11 +260,15 @@ contract PrimaryIssuePool is IPrimaryPool, BasePool, IGeneralPool {
 
         // returning currency for current price of security paid in,
         // but only if new price of security do not go out of price band
+        // Gerg -- this if statement doesn't do anything. The previous require has already mandated that this is true
         if (request.tokenOut == _currency) {
             uint256 postPaidSecurityBalance = Math.add(balances[_securityIndex], request.amount);
             uint256 tokenOutAmt = Math.sub(balances[_currencyIndex], balances[_securityIndex].mulDown(balances[_currencyIndex].divDown(postPaidSecurityBalance)));
             uint256 postPaidCurrencyBalance = Math.sub(balances[_currencyIndex], tokenOutAmt);
             
+            // Gerg -- I understand that you are checking price bounds here, but this setup is very bad for traders.
+            // In the current setup, if a trade goes out of bounds, the pool just takes the traders tokens and gives them nothing
+            // This should be a require() instead of an if statement that returns zero if false
             if (
                 postPaidCurrencyBalance.divDown(postPaidSecurityBalance) >= params.minPrice &&
                 postPaidCurrencyBalance.divDown(postPaidSecurityBalance) <= params.maxPrice
@@ -268,11 +291,15 @@ contract PrimaryIssuePool is IPrimaryPool, BasePool, IGeneralPool {
 
         // returning security for currency paid in at current price of security,
         // but only if new price of security do not go out of price band
+        // Gerg -- this if statement doesn't do anything. The previous require has already mandated that this is true
         if (request.tokenOut == _security) {
             uint256 postPaidCurrencyBalance = Math.add(balances[_currencyIndex], request.amount);
             uint256 tokenOutAmt = Math.sub(balances[_securityIndex], balances[_currencyIndex].mulDown(balances[_securityIndex].divDown(postPaidCurrencyBalance)));
             uint256 postPaidSecurityBalance = Math.sub(balances[_securityIndex], tokenOutAmt);
 
+            // Gerg -- I understand that you are checking price bounds here, but this setup is very bad for traders.
+            // In the current setup, if a trade goes out of bounds, the pool just takes the traders tokens and gives them nothing
+            // This should be a require() instead of an if statement that returns zero if false
             if (
                 postPaidCurrencyBalance.divDown(postPaidSecurityBalance) >= params.minPrice &&
                 postPaidCurrencyBalance.divDown(postPaidSecurityBalance) <= params.maxPrice
@@ -300,7 +327,7 @@ contract PrimaryIssuePool is IPrimaryPool, BasePool, IGeneralPool {
             _revert(Errors.INVALID_TOKEN);
         }
     }
-
+    // Gerg -- The bulk of the code in _swapSecurityOut and _swapCurrencyOut is identical. This should be one function with arguments for which token is coming in.
     function _swapSecurityOut(
         SwapRequest memory request,
         uint256[] memory balances,
@@ -309,11 +336,15 @@ contract PrimaryIssuePool is IPrimaryPool, BasePool, IGeneralPool {
         _require(request.tokenIn == _currency, Errors.INVALID_TOKEN);
 
         //returning security to be swapped out for paid in currency
+        // Gerg -- this if statement doesn't do anything. The previous require has already mandated that this is true
         if (request.tokenIn == _currency) {
             uint256 postPaidSecurityBalance = Math.sub(balances[_securityIndex], request.amount);
             uint256 tokenInAmt = Math.sub(balances[_securityIndex].mulDown(balances[_currencyIndex].divDown(postPaidSecurityBalance)), balances[_currencyIndex]);
             uint256 postPaidCurrencyBalance = Math.add(balances[_currencyIndex], tokenInAmt);
 
+            // Gerg -- I understand that you are checking price bounds here, but this setup is very bad for traders.
+            // In the current setup, if a trade goes out of bounds, the pool just takes the traders tokens and gives them nothing
+            // This should be a require() instead of an if statement that returns zero if false
             if (
                 postPaidCurrencyBalance.divDown(postPaidSecurityBalance) >= params.minPrice &&
                 postPaidCurrencyBalance.divDown(postPaidSecurityBalance) <= params.maxPrice
@@ -335,11 +366,15 @@ contract PrimaryIssuePool is IPrimaryPool, BasePool, IGeneralPool {
         _require(request.tokenIn == _security, Errors.INVALID_TOKEN);
 
         //returning currency to be paid in for security paid in
+        // Gerg -- this if statement doesn't do anything. The previous require has already mandated that this is true
         if (request.tokenIn == _security) {
             uint256 postPaidCurrencyBalance = Math.sub(balances[_currencyIndex], request.amount);
             uint256 tokenInAmt = Math.sub(balances[_currencyIndex].mulDown(balances[_securityIndex].divDown(postPaidCurrencyBalance)), balances[_securityIndex]);
             uint256 postPaidSecurityBalance = Math.add(balances[_securityIndex], tokenInAmt);
 
+            // Gerg -- I understand that you are checking price bounds here, but this setup is very bad for traders.
+            // In the current setup, if a trade goes out of bounds, the pool just takes the traders tokens and gives them nothing
+            // This should be a require() instead of an if statement that returns zero if false
             if (
                 postPaidCurrencyBalance.divDown(postPaidSecurityBalance) >= params.minPrice &&
                 postPaidCurrencyBalance.divDown(postPaidSecurityBalance) <= params.maxPrice
@@ -364,9 +399,16 @@ contract PrimaryIssuePool is IPrimaryPool, BasePool, IGeneralPool {
         _require(sender == address(this), Errors.INVALID_INITIALIZATION);
         _require(recipient == address(this), Errors.INVALID_INITIALIZATION);
         
-        uint256 bptAmountOut = _INITIAL_BPT_SUPPLY;
-        uint256[] memory amountsIn = new uint256[](_TOTAL_TOKENS);
-        amountsIn[_bptIndex] = _INITIAL_BPT_SUPPLY;
+        // Gerg -- why are you minting the max amount of BPT to yourself?
+        uint256 bptAmountOut = _INITIAL_BPT_SUPPLY; // Gerg -- why are you hard coding this when it's encoded in your arguments?
+        uint256[] memory amountsIn = new uint256[](_TOTAL_TOKENS); // Gerg -- why are your input amounts zero? Your initialize function 
+        /* Gerg -- why did you set these in initialize() if you're just passing in zeros?
+        _maxAmountsIn[_securityIndex] = _MAX_TOKEN_BALANCE;
+        _maxAmountsIn[_currencyIndex] = Math.div(_MAX_TOKEN_BALANCE, _minPrice, false);
+        */
+        amountsIn[_bptIndex] = _INITIAL_BPT_SUPPLY; // Gerg -- why are you hard coding this when it's encoded in your arguments?
+
+        // Gerg bptAmountOut AND amountsIn are set to _INITIAL_BPT_SUPPLY, which doesn't make sense. What is your goal for the pool's and owner's BPT?
 
         return (bptAmountOut, amountsIn);
     }
@@ -395,6 +437,7 @@ contract PrimaryIssuePool is IPrimaryPool, BasePool, IGeneralPool {
         bytes memory userData
     ) internal view override returns (uint256 bptAmountIn, uint256[] memory amountsOut) {
         PrimaryPoolUserData.ExitKind kind = userData.exitKind();
+        // Gerg -- why if(...){revert()}? why not require(condition,error)?
         if (kind != PrimaryPoolUserData.ExitKind.EMERGENCY_EXACT_BPT_IN_FOR_TOKENS_OUT) {
             //usually exit pool reverts
             _revert(Errors.UNHANDLED_BY_PRIMARY_POOL);
