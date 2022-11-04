@@ -1,0 +1,28 @@
+Secondary Pool Review
+
+Critical: Pool can steal tokens from traders
+- all base cases for swaps return zeros. This must revert instead.
+
+Critical: Loss of access to funds when making multiple orders in one block
+bytes32 ref = keccak256(abi.encodePacked(_request.from, block.timestamp));
+- technique for crafting `ref` is flawed. must include an incrementing nonce to avoid duplicate `ref`s
+
+Errors:
+- Could not run tests
+- market orders are instantly declared "filled" before checking to see if it will be filled
+
+Recommendations:
+- Many arbitrageurs will ignore your pool unless you have a swap that ignores userData. You can easily add a no-userdata case that would execute a market order with the best available price
+- Using mappings as arrays
+- Should not be using (mappings as) arrays in many cases. This is the wrong data structure. There are value-aware structures (ie max heap: https://github.com/Dev43/heap-solidity/blob/master/contracts/Heap.sol) that are much better suited for this usage. Automatically gives you the max, and removal of an element costs O(logN) rather than O(N)
+
+Style
+- Defunct, commented lines in code
+- Missing useful comments throughout (ideally NatSpec)
+- String parameters (ie "Market") should be enums
+- whole function is wrapped in if(condition){} rather than leading with require(condition,reason)
+- multiple cases of if(a){doXyz}elseif(b){doXyz} should be if (a||b){doXyz}
+- single line if(a) doSomething() --> use curly braces and newlines
+
+Questions
+- Why does the manager have authority to revert trades?
