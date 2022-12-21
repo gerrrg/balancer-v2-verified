@@ -35,7 +35,7 @@ library StringUtils { // Only relevant functions
         }
         return string(result);
     }
-
+    // GERG: why is there a commented-out function here?
     /*function substring(bytes32 strBytes, uint startIndex, uint endIndex) internal pure returns (string memory) {
         bytes memory result = new bytes(endIndex-startIndex);
         for(uint i = startIndex; i < endIndex; i++) {
@@ -74,6 +74,8 @@ library StringUtils { // Only relevant functions
         }
     }
 
+    // GERG: it's great to see natspec comments, but why are they only on a few functions? 
+    
     /// @dev Does a byte-by-byte lexicographical comparison of two strings.
     /// @return a negative number if `_a` is smaller, zero if they are equal
     /// and a positive numbe if `_b` is smaller.

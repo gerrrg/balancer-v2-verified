@@ -7,8 +7,10 @@ pragma experimental ABIEncoderV2;
 
 interface IPrimaryIssuePool {
 
+    // GERG: not implemented. remove.
     function getPoolId() external returns(bytes32);
 
+    // GERG: not implemented. remove.
     function initialize() external;
 
     function getSecurity() external view returns (address);
@@ -23,6 +25,7 @@ interface IPrimaryIssuePool {
 
     function getIssueCutoffTime() external view returns(uint256);
 
+    // GERG: not implemented. remove.
     function exit() external;
 
 }

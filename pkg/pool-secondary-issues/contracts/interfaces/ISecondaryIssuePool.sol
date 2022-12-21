@@ -6,8 +6,10 @@ pragma experimental ABIEncoderV2;
 
 interface ISecondaryIssuePool {
 
+    //GERG: function not implemented
     function getPoolId() external returns(bytes32);
 
+    //GERG: function not implemented
     function initialize() external;
 
     function getSecurity() external view returns (address);
@@ -16,6 +18,7 @@ interface ISecondaryIssuePool {
 
     function getSecurityOffered() external view returns(uint256);
 
+    //GERG: function not implemented
     function exit() external;
 
     function getOrderRef() external view returns(bytes32[] memory);

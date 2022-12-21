@@ -25,19 +25,23 @@ contract SecondaryIssuePool is BasePool, IGeneralPool {
 
     Orderbook public _orderbook;
     
+    // GERG: make this immutable. Emit what you are setting this to.
     address private _security;
+    // GERG: make this immutable. Emit what you are setting this to.
     address private _currency;
 
     uint256 private constant _TOTAL_TOKENS = 3; //Security token, Currency token (ie, paired token), Balancer pool token
 
     uint256 private constant _INITIAL_BPT_SUPPLY = 2**(112) - 1;
 
+    // GERG: make this immutable. Emit what you are setting this to.
     uint256 private _MAX_TOKEN_BALANCE;
 
     uint256 private immutable _bptIndex;
     uint256 private immutable _securityIndex;
     uint256 private immutable _currencyIndex;
 
+    // GERG: make this immutable. Emit what you are setting this to.
     address payable private _balancerManager;
     
     //order matching related    
@@ -109,14 +113,16 @@ contract SecondaryIssuePool is BasePool, IGeneralPool {
         emit Offer(_security, _MAX_TOKEN_BALANCE);
     }
 
+    // GERG: variable _orderbook is already a public variable. No getter necessary.
     function getOrderbook() public view returns (Orderbook) {
         return _orderbook;
     }
 
+    // GERG: these should be public instead of external, and then w/in code you should use getSecurity instead of directly accessing the variable.
     function getSecurity() external view returns (address) {
         return _security;
     }
-
+    // GERG: these should be public instead of external, and then w/in code you should use getCurrency instead of directly accessing the variable.
     function getCurrency() external view returns (address) {
         return _currency;
     }
@@ -131,7 +137,7 @@ contract SecondaryIssuePool is BasePool, IGeneralPool {
         uint256 indexIn,
         uint256 indexOut
     ) public override onlyVault(request.poolId) whenNotPaused returns (uint256) {
-        require (request.kind == IVault.SwapKind.GIVEN_IN || request.kind == IVault.SwapKind.GIVEN_OUT, "Invalid swap");
+        require(request.kind == IVault.SwapKind.GIVEN_IN || request.kind == IVault.SwapKind.GIVEN_OUT, "Invalid swap");
         require(request.tokenOut == IERC20(_currency) ||
                 request.tokenOut == IERC20(_security) ||
                 request.tokenIn == IERC20(_currency) ||
@@ -143,11 +149,16 @@ contract SecondaryIssuePool is BasePool, IGeneralPool {
 
         if(request.userData.length!=0){
             if(request.amount==0){
+                // GERG: so much of the code between this if block and its corresponding else if block is identical. This should be unified.
                 if(request.kind == IVault.SwapKind.GIVEN_IN){
                     if (request.tokenIn == IERC20(_security) || request.tokenIn == IERC20(_currency)) {
                         emit BestAvailableTrades(_bestUnfilledBid, _bestUnfilledOffer);
                         ITrade.trade memory tradeToReport = _orderbook.getTrade(request.from, string(request.userData).stringToUint());
                         ISettlor(_balancerManager).requestSettlement(tradeToReport, _orderbook);
+                        // GERG: a few issues with using keccak256(abi.encodePacked(<string>)) repeatedly:
+                        // 1. Makes code difficult to read
+                        // 2. Is pretty inefficient
+                        // Possible alternate: these likely could and therefore should be replaced with enums
                         uint256 amount = keccak256(abi.encodePacked(tradeToReport.partyTokenIn))==keccak256(abi.encodePacked("security")) ? tradeToReport.partyInAmount : tradeToReport.counterpartyInAmount;
                         emit TradeReport(
                             tradeToReport.security,
@@ -168,6 +179,10 @@ contract SecondaryIssuePool is BasePool, IGeneralPool {
                         emit BestAvailableTrades(_bestUnfilledBid, _bestUnfilledOffer);
                         ITrade.trade memory tradeToReport = _orderbook.getTrade(request.from, string(request.userData).stringToUint());
                         ISettlor(_balancerManager).requestSettlement(tradeToReport, _orderbook);
+                        // GERG: a few issues with using keccak256(abi.encodePacked(<string>)) repeatedly:
+                        // 1. Makes code difficult to read
+                        // 2. Is pretty inefficient
+                        // Possible alternate: these likely could and therefore should be replaced with enums
                         uint256 amount = keccak256(abi.encodePacked(tradeToReport.partyTokenIn))==keccak256(abi.encodePacked("security")) ? tradeToReport.partyInAmount : tradeToReport.counterpartyInAmount;
                         emit TradeReport(
                             tradeToReport.security,
@@ -223,7 +238,9 @@ contract SecondaryIssuePool is BasePool, IGeneralPool {
             _orderbook.newOrder(request, params, IOrder.Order.Buy, balances, _currencyIndex, _securityIndex);
         }
     }
-
+    
+    // GERG: everything after this comment appears to be identical to the code at the bottom of PrimaryIssuePool.sol. Why not inherit this functionality so you don't need to write it twice?
+    // It would also make cleaning up these functions much easier. 
     function _onInitializePool(
         bytes32,
         address sender,
@@ -232,6 +249,7 @@ contract SecondaryIssuePool is BasePool, IGeneralPool {
         bytes memory userData
     ) internal view override whenNotPaused returns (uint256, uint256[] memory) {
         //on initialization, pool simply premints max BPT supply possible
+        // GERG: make a local copy of `address balancerManager = _balancerManager;` to decrease your storage reads.
         _require(sender == _balancerManager, Errors.INVALID_INITIALIZATION);
         _require(recipient == payable(_balancerManager), Errors.INVALID_INITIALIZATION);
 
@@ -270,10 +288,11 @@ contract SecondaryIssuePool is BasePool, IGeneralPool {
             //usually exit pool reverts
             _revert(Errors.UNHANDLED_BY_SECONDARY_POOL);
         } else {
+            // GERG: this the expected use case; do not call it emergency unless it is truly an emergency use case.
             (bptAmountIn, amountsOut) = _emergencyProportionalExit(balances, userData);
         }
     }
-
+    // GERG: this the expected use case; do not call it emergency unless it is truly an emergency use case.
     function _emergencyProportionalExit(uint256[] memory balances, bytes memory userData)
         private
         view
@@ -293,14 +312,17 @@ contract SecondaryIssuePool is BasePool, IGeneralPool {
         return (bptAmountIn, amountsOut);
     }
 
+    // GERG: why are _getMaxTokens and _getTotalTokens identical except one is pure and the other is view virtual? also neither of these are being used
     function _getMaxTokens() internal pure override returns (uint256) {
         return _TOTAL_TOKENS;
     }
 
+    // GERG: why are _getMaxTokens and _getTotalTokens identical except one is pure and the other is view virtual? also neither of these are being used
     function _getTotalTokens() internal view virtual override returns (uint256) {
         return _TOTAL_TOKENS;
     }
 
+    // GERG: based on the _scalingFactors function below, shouldn't this also have `|| token == _bpt` in the allowable set?
     function _scalingFactor(IERC20 token) internal view virtual override returns (uint256) {
         if (token == IERC20(_security) || token == IERC20(_currency) || token == IERC20(this)) {
             return FixedPoint.ONE;
@@ -308,7 +330,16 @@ contract SecondaryIssuePool is BasePool, IGeneralPool {
             _revert(Errors.INVALID_TOKEN);
         }
     }
+    
+    // GERG: this function is gas inefficient. it does 4 storage reads and only needs to do 1.
+    // GERG: also why are you reading _TOTAL_TOKENS directly if you wrote a (actually, two) getter(s)?
 
+    // uint256 numTokens = _getMaxTokens();
+    // uint256[] memory scalingFactors = new uint256[](numTokens);
+    // for(uint256 i = 0; i < numTokens; i++) {
+    //    scalingFactors[i] = FixedPoint.ONE;
+    // }
+    // return scalingFactors
     function _scalingFactors() internal view virtual override returns (uint256[] memory) {
         uint256[] memory scalingFactors = new uint256[](_TOTAL_TOKENS);
         scalingFactors[_securityIndex] = FixedPoint.ONE;

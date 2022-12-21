@@ -21,6 +21,7 @@ contract SecondaryIssuePoolFactory is BasePoolFactory, FactoryWidePauseWindow {
     }
 
     function create(
+        // GERG: I would lose the leading underscores here since they are not a storage variables
         string calldata _name,
         string calldata _symbol,
         address _security,
@@ -35,6 +36,7 @@ contract SecondaryIssuePoolFactory is BasePoolFactory, FactoryWidePauseWindow {
             _create(
                 abi.encode(  
                     getVault(),
+                    // GERG: I would lose the leading underscores here since they are not a storage variables
                     _name,
                     _symbol,
                     _security,

@@ -86,6 +86,14 @@ contract Orderbook is IOrder, ITrade, Ownable{
             _previousTs = _previousTs + 1;
         else
             _previousTs = block.timestamp;
+        // GERG: I have recommended in the past that you use a nonce instead of this meaningless `_previousTs` variable; it will be easier to
+        // understand and more efficient since it does not require any conditional statement. You don't even need the timestamp. I still advise that.
+        
+        // Example:
+        // uint256 private _refNonce;
+        // ...
+        // bytes32 ref = keccak256(abi.encodePacked(_request.from, _refNonce++));
+
         bytes32 ref = keccak256(abi.encodePacked(_request.from, _previousTs));
         //fill up order details
         IOrder.order memory nOrder = IOrder.order({
@@ -146,6 +154,7 @@ contract Orderbook is IOrder, ITrade, Ownable{
         }        
     }
 
+    // GERG: does the pool told the tokens from the pending orders? is this supposed to give those tokens back?
     function cancelOrder(bytes32 ref) external override {
         require(orders[ref].party == msg.sender, "Sender is not order creator");
         delete _marketOrders[_marketOrderIndex[ref]];
@@ -447,7 +456,8 @@ contract Orderbook is IOrder, ITrade, Ownable{
         return tradeRefs[_party][_timestamp];
     }
 
-    function getBestTrade( ) public view onlyOwner returns(uint256, uint256){
+    // GERG: why is this onlyOwner if it's public?
+    function getBestTrade() public view onlyOwner returns(uint256, uint256){
         return (_bestUnfilledBid, _bestUnfilledOffer);
     }
 
@@ -456,9 +466,10 @@ contract Orderbook is IOrder, ITrade, Ownable{
         uint256 _qty,
         Order _order
     ) external override {
+        // GERG: why use require balancerManager == msg.sender instead of using onlyOwner like you do in other places?
         require(_balancerManager == msg.sender);
         require(_order == Order.Buy || _order == Order.Sell);
-        orders[_orderRef].qty = orders[_orderRef].qty + _qty;
+        orders[_orderRef].qty = orders[_orderRef].qty + _qty; // GERG: the manager can just override the quantity of someone's trade here? this seems very dangerous.
         orders[_orderRef].status = OrderStatus.Open;
         //push to order book
         if (orders[_orderRef].otype == IOrder.OrderType.Market) {
@@ -470,7 +481,11 @@ contract Orderbook is IOrder, ITrade, Ownable{
         }
     }
 
+    // GERG: what is this supposed to do? The manager can just declare two orders have been filled and erase everything?
+    // There is nothing emitted here, no tokens returned here, no event emitted here. Unless I'm misunderstanding this function, these seems very dangerous for users.
+    // Additionally, there is nothing checking that these orders have the same size, or even matching opposing tokens.
     function orderFilled(bytes32 partyRef, bytes32 counterpartyRef) external override {
+        // GERG: why use require balancerManager == msg.sender instead of using onlyOwner like you do in other places?
         require(_balancerManager == msg.sender);
         delete _userOrderRefs[orders[partyRef].party][_userOrderIndex[partyRef]];
         delete _userOrderIndex[partyRef];
@@ -484,10 +499,13 @@ contract Orderbook is IOrder, ITrade, Ownable{
         delete _orderIndex[counterpartyRef];
     }
 
+    // GERG: what is this supposed to do? The manager can just declare two orders have been filled?
+    // There is nothing emitted here, no tokens returned here, no event emitted here. Unless I'm misunderstanding this function, these seems very dangerous for users.
     function tradeSettled(
         bytes32 partyRef,
         bytes32 counterpartyRef
     ) external override {
+        // GERG: why use require balancerManager == msg.sender instead of using onlyOwner like you do in other places?
         require(_balancerManager == msg.sender);
         orders[partyRef].status = OrderStatus.Filled;
         orders[counterpartyRef].status = OrderStatus.Filled;

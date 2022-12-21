@@ -19,7 +19,7 @@ contract PrimaryIssuePoolFactory is BasePoolFactory, FactoryWidePauseWindow {
     {
         // solhint-disable-previous-line no-empty-blocks
     }
-
+    // GERG: I would lose the leading underscore here since it is not a storage variable
     function create(IPrimaryIssuePoolFactory.FactoryPoolParams memory _factoryPoolParams
                     ) external returns (address){
 
@@ -29,7 +29,7 @@ contract PrimaryIssuePoolFactory is BasePoolFactory, FactoryWidePauseWindow {
             _create(
                 abi.encode(
                     getVault(),
-                    _factoryPoolParams,
+                    _factoryPoolParams, // GERG: I would lose the leading underscore here since it is not a storage variable
                     pauseWindowDuration,
                     bufferPeriodDuration,
                     msg.sender

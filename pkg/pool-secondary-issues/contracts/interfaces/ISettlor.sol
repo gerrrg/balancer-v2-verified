@@ -9,8 +9,10 @@ import "./IOrder.sol";
 
 interface ISettlor {
 
+    // GERG: why is this commented out enum here?
     //enum SettlementStatus { Confirm, Reject, Pending }
 
+    // GERG: why is this commented out enum here?
     /*enum FeeType {  Regulatory, 
                     Tax,
                     Commission,
